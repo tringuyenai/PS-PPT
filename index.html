@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Slides Pro - Ứng Dụng Thuyết Trình PowerPoint HTML</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:wght@600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                        serif: ['"Playfair Display"', 'serif'],
+                        mono: ['"Fira Code"', 'monospace'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* Aspect Ratio Container for 16:9 Slides */
+        .slide-aspect {
+            aspect-ratio: 16 / 9;
+        }
+
+        /* Slide Transitions */
+        .slide-transition-fade {
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+        
+        .slide-enter {
+            opacity: 0;
+            transform: scale(0.96);
+        }
+        
+        .slide-active {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(107, 114, 128, 0.8);
+        }
+
+        /* Canvas Drawing Overlay */
+        #drawingCanvas {
+            touch-action: none;
+        }
+
+        /* Laser Pointer Effect */
+        .laser-pointer {
+            cursor: none;
+        }
+        #laserDot {
+            pointer-events: none;
+            box-shadow: 0 0 12px 4px rgba(239, 68, 68, 0.9);
+        }
+
+        /* Fullscreen Slide Styling */
+        :-webkit-full-screen .slide-stage {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+        }
+        :-ms-fullscreen .slide-stage {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+        }
+        :fullscreen .slide-stage {
+            width: 100vw;
+            height: 100vh;
+            border-radius: 0;
+        }
+
+        /* Print CSS for exporting PDF */
+        @media print {
+            .no-print { display: none !important; }
+            .slide-stage { 
+                page-break-after: always; 
+                width: 100vw !important; 
+                height: 56.25vw !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Top Header Navigation -->
+    <header class="no-print bg-slate-800/90 backdrop-blur-md border-b border-slate-700/80 sticky top-0 z-40 px-4 py-2.5 flex items-center justify-between gap-4">
+        <!-- App Title & Logo -->
+        <div class="flex items-center space-x-3">
+            <div class="bg-gradient-to-tr from-blue-600 to-indigo-500 text-white p-2 rounded-xl shadow-lg shadow-blue-500/30 flex items-center justify-center w-10 h-10">
+                <i class="fa-solid fa-file-powerpoint text-xl"></i>
+            </div>
+            <div>
+                <input id="presentationTitle" type="text" value="Bài Thuyết Trình Mới" class="bg-transparent font-bold text-base text-white focus:outline-none focus:bg-slate-700/50 px-2 py-0.5 rounded border border-transparent focus:border-slate-500 transition" />
+                <p class="text-xs text-slate-400 px-2 flex items-center gap-2">
+                    <span id="slideCountBadge" class="text-blue-400 font-semibold">0 slide</span>
+                    <span>•</span>
+                    <span id="autosaveStatus" class="text-emerald-400 text-[11px]"><i class="fa-solid fa-circle-check"></i> Tự động lưu</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Central Quick Actions -->
+        <div class="flex items-center space-x-1 sm:space-x-2">
+            <button onclick="toggleMode('edit')" id="btnEditMode" class="px-3 py-1.5 rounded-lg text-xs font-medium flex items-center space-x-1.5 transition bg-blue-600 text-white shadow-md">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span class="hidden md:inline">Soạn Thảo</span>
+            </button>
+            <button onclick="startPresentation()" id="btnPresentMode" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 flex items-center space-x-1.5 transition">
+                <i class="fa-solid fa-play text-emerald-400"></i>
+                <span>Trình Chiếu (F5)</span>
+            </button>
+
+            <div class="h-5 w-[1px] bg-slate-700 mx-1"></div>
+
+            <button onclick="openPhotoLibraryModal()" class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 flex items-center space-x-1.5 transition">
+                <i class="fa-solid fa-images text-indigo-400"></i>
+                <span class="hidden sm:inline">Kho Ảnh Local</span>
+            </button>
+        </div>
+
+        <!-- Right Side Controls -->
+        <div class="flex items-center space-x-2">
+            <button onclick="exportPresentationJSON()" title="Tải file dự án (.json)" class="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs flex items-center gap-1.5 px-2.5">
+                <i class="fa-solid fa-download"></i>
+                <span class="hidden lg:inline">Xuất File</span>
+            </button>
+            
+            <label title="Mở file dự án (.json)" class="p-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs flex items-center gap-1.5 px-2.5 cursor-pointer">
+                <i class="fa-solid fa-upload"></i>
+                <span class="hidden lg:inline">Mở File</span>
+                <input type="file" id="importJsonInput" accept=".json" class="hidden" onchange="importPresentationJSON(event)">
+            </label>
+
+            <button onclick="createNewPresentation()" title="Tạo dự án mới" class="p-2 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 transition text-xs">
+                <i class="fa-solid fa-file-circle-plus"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Grid -->
+    <div class="flex-1 flex overflow-hidden relative" id="workspaceContainer">
+
+        <!-- LEFT SIDEBAR: Slide Thumbnails List -->
+        <aside id="leftSidebar" class="no-print w-64 border-r border-slate-800 bg-slate-950/60 flex flex-col shrink-0 transition-all duration-300">
+            <!-- Sidebar Header -->
+            <div class="p-3 border-b border-slate-800 flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                    <i class="fa-solid fa-layer-group text-blue-400"></i> Danh sách Slide
+                </span>
+                <button onclick="addNewSlide()" class="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium flex items-center gap-1 shadow-md transition">
+                    <i class="fa-solid fa-plus"></i> Thêm
+                </button>
+            </div>
+
+            <!-- Slide Thumbnails Container -->
+            <div id="slideThumbnails" class="flex-1 overflow-y-auto p-3 space-y-3">
+                <!-- Dynamically Populated Thumbnails -->
+            </div>
+
+            <!-- Sidebar Footer Controls -->
+            <div class="p-2.5 border-t border-slate-800 bg-slate-900/80 flex items-center justify-between text-xs text-slate-400">
+                <button onclick="duplicateCurrentSlide()" title="Nhân bản Slide" class="hover:text-white p-1.5 rounded hover:bg-slate-800">
+                    <i class="fa-regular fa-copy"></i> Nhân bản
+                </button>
+                <button onclick="deleteCurrentSlide()" title="Xóa Slide này" class="hover:text-rose-400 p-1.5 rounded hover:bg-slate-800 text-slate-400">
+                    <i class="fa-regular fa-trash-can"></i> Xóa Slide
+                </button>
+            </div>
+        </aside>
+
+        <!-- CENTER: Main Presentation Slide Canvas Area -->
+        <main class="flex-1 bg-slate-950 flex flex-col items-center justify-center p-4 md:p-8 overflow-auto relative" id="mainCanvasArea">
+            
+            <!-- Slide Container Wrapper (16:9 Responsive Ratio) -->
+            <div id="slideStageWrapper" class="w-full max-w-5xl transition-all duration-300 flex flex-col items-center">
+                
+                <!-- Slide Display Stage -->
+                <div id="currentSlideStage" class="slide-stage slide-aspect w-full rounded-2xl shadow-2xl relative overflow-hidden flex flex-col border border-slate-700/50 bg-white text-slate-900 transition-all duration-300 transform">
+                    <!-- Dynamic Slide Content rendered here -->
+                </div>
+
+                <!-- On-Slide Presentation Control Toolbar (Shown in Editor & Presenter View) -->
+                <div id="presentationControls" class="mt-4 bg-slate-800/90 backdrop-blur border border-slate-700 px-4 py-2 rounded-full flex items-center space-x-4 shadow-xl z-20">
+                    <button onclick="prevSlide()" class="text-slate-300 hover:text-white p-1.5 rounded-full hover:bg-slate-700 transition" title="Slide trước (Mũi tên trái)">
+                        <i class="fa-solid fa-chevron-left text-base"></i>
+                    </button>
+                    
+                    <span id="slideIndicator" class="text-xs font-semibold text-slate-300 min-w-[60px] text-center">
+                        1 / 1
+                    </span>
+
+                    <button onclick="nextSlide()" class="text-slate-300 hover:text-white p-1.5 rounded-full hover:bg-slate-700 transition" title="Slide sau (Mũi tên phải)">
+                        <i class="fa-solid fa-chevron-right text-base"></i>
+                    </button>
+
+                    <div class="h-4 w-[1px] bg-slate-700"></div>
+
+                    <!-- Interactive Annotation Tools -->
+                    <button onclick="toggleLaserPointer()" id="btnLaser" class="text-slate-400 hover:text-rose-400 p-1.5 rounded-full hover:bg-slate-700 transition" title="Bật/Tắt Đèn Laser (Phím P)">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </button>
+
+                    <button onclick="togglePenTool()" id="btnPen" class="text-slate-400 hover:text-amber-400 p-1.5 rounded-full hover:bg-slate-700 transition" title="Bật/Tắt Bút Vẽ (Phím C)">
+                        <i class="fa-solid fa-pen-nib"></i>
+                    </button>
+
+                    <button onclick="clearCanvasDrawing()" class="text-slate-400 hover:text-slate-200 p-1.5 rounded-full hover:bg-slate-700 transition" title="Xóa chú thích trên slide">
+                        <i class="fa-solid fa-eraser"></i>
+                    </button>
+
+                    <div class="h-4 w-[1px] bg-slate-700"></div>
+
+                    <button onclick="toggleSpeakerNotes()" class="text-slate-400 hover:text-blue-400 p-1.5 rounded-full hover:bg-slate-700 transition" title="Ghi chú người thuyết trình">
+                        <i class="fa-regular fa-note-sticky"></i>
+                    </button>
+
+                    <button onclick="toggleFullscreen()" class="text-slate-400 hover:text-emerald-400 p-1.5 rounded-full hover:bg-slate-700 transition" title="Toàn màn hình (F)">
+                        <i class="fa-solid fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Drawing Canvas Overlay (Placed over slide when pen active) -->
+            <canvas id="drawingCanvas" class="absolute inset-0 pointer-events-none z-30"></canvas>
+
+            <!-- Laser Pointer Circle element -->
+            <div id="laserDot" class="fixed w-5 h-5 rounded-full bg-rose-500 border-2 border-white z-50 hidden -translate-x-1/2 -translate-y-1/2"></div>
+        </main>
+
+        <!-- RIGHT SIDEBAR: Slide Content & Styling Editor -->
+        <aside id="rightSidebar" class="no-print w-80 border-l border-slate-800 bg-slate-950/80 flex flex-col shrink-0 overflow-y-auto">
+            <!-- Header Tabs -->
+            <div class="p-3 border-b border-slate-800 flex items-center justify-around bg-slate-900/50">
+                <button onclick="switchEditorTab('content')" id="tabBtnContent" class="text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white transition">
+                    <i class="fa-solid fa-sliders mr-1"></i> Nội Dung
+                </button>
+                <button onclick="switchEditorTab('style')" id="tabBtnStyle" class="text-xs font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-palette mr-1"></i> Giao Diện
+                </button>
+                <button onclick="switchEditorTab('notes')" id="tabBtnNotes" class="text-xs font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-comment-dots mr-1"></i> Ghi Chú
+                </button>
+            </div>
+
+            <!-- Tab 1: Content Editor -->
+            <div id="tabContent" class="p-4 space-y-4">
+                <!-- Layout Preset Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5 uppercase tracking-wide">Bố Cục Slide (Layout)</label>
+                    <select id="editorLayout" onchange="updateSlideProperty('layout', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="title">Slide Tiêu Đề (Title Slide)</option>
+                        <option value="content-image">Nội Dung + Hình Ảnh</option>
+                        <option value="image-content">Hình Ảnh + Nội Dung</option>
+                        <option value="bullets">Danh Sách Ý (Bullet Points)</option>
+                        <option value="quote">Trích Dẫn Nổi Bật (Quote)</option>
+                        <option value="big-image">Ảnh To Toàn Màn Hình</option>
+                        <option value="code">Đoạn Mã / Mã Nguồn (Code)</option>
+                    </select>
+                </div>
+
+                <!-- Title Field -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Tiêu Đề Chính</label>
+                    <input type="text" id="editorTitle" oninput="updateSlideProperty('title', this.value)" placeholder="Nhập tiêu đề slide..." class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <!-- Subtitle Field -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Tiêu Đề Phụ / Phụ Đề</label>
+                    <input type="text" id="editorSubtitle" oninput="updateSlideProperty('subtitle', this.value)" placeholder="Nhập phụ đề..." class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                </div>
+
+                <!-- Body Content Field -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nội Dung Chi Tiết (Nhiều dòng)</label>
+                    <textarea id="editorBody" oninput="updateSlideProperty('body', this.value)" rows="4" placeholder="Mỗi dòng là một ý hoặc đoạn văn..." class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <!-- Image Selection Section -->
+                <div class="border-t border-slate-800 pt-3">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="text-xs font-semibold text-slate-400 uppercase tracking-wide">Hình Ảnh Slide</label>
+                        <button onclick="openPhotoLibraryModal()" class="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium">
+                            <i class="fa-solid fa-folder-open"></i> Chọn từ Kho
+                        </button>
+                    </div>
+
+                    <!-- Image URL / Path Input -->
+                    <div class="space-y-2">
+                        <input type="text" id="editorImage" oninput="updateSlideProperty('image', this.value)" placeholder="VD: ./photos/hinh1.jpg hoặc URL..." class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <p class="text-[10px] text-slate-500">Gợi ý: Nhập đường dẫn ảnh trong folder photo của bạn hoặc nhấn 'Chọn từ Kho' bên trên.</p>
+                    </div>
+
+                    <!-- Direct Quick Upload File for this slide -->
+                    <div class="mt-2">
+                        <label class="block w-full border border-dashed border-slate-700 hover:border-slate-500 rounded-lg p-2 text-center cursor-pointer bg-slate-900/50 hover:bg-slate-900 transition">
+                            <i class="fa-solid fa-cloud-arrow-up text-slate-400 text-sm mb-1 block"></i>
+                            <span class="text-[11px] text-slate-300 font-medium">Tải ảnh từ máy cho slide này</span>
+                            <input type="file" accept="image/*" class="hidden" onchange="uploadImageForCurrentSlide(event)">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Style & Theme Editor -->
+            <div id="tabStyle" class="p-4 space-y-4 hidden">
+                <!-- Theme Palette Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-2 uppercase tracking-wide">Giao Diện Màu Sắc Slide</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="updateSlideProperty('theme', 'modern-light')" class="p-2.5 rounded-lg border border-slate-700 bg-white text-slate-900 text-left text-xs font-bold hover:ring-2 hover:ring-blue-500 transition">
+                            ⚪ Hiện Đại Trắng
+                        </button>
+                        <button onclick="updateSlideProperty('theme', 'dark-tech')" class="p-2.5 rounded-lg border border-slate-700 bg-slate-900 text-white text-left text-xs font-bold hover:ring-2 hover:ring-blue-500 transition">
+                            ⚫ Tech Tối Sáng
+                        </button>
+                        <button onclick="updateSlideProperty('theme', 'gradient-blue')" class="p-2.5 rounded-lg border border-slate-700 bg-gradient-to-br from-blue-900 to-indigo-900 text-white text-left text-xs font-bold hover:ring-2 hover:ring-blue-500 transition">
+                            🔵 Gradient Xanh
+                        </button>
+                        <button onclick="updateSlideProperty('theme', 'warm-editorial')" class="p-2.5 rounded-lg border border-slate-700 bg-amber-50 text-amber-950 text-left text-xs font-bold hover:ring-2 hover:ring-blue-500 transition">
+                            📜 Cổ Điển Ấm
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Font Style Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Kiểu Phông Chữ (Font)</label>
+                    <select id="editorFont" onchange="updateSlideProperty('font', this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500">
+                        <option value="font-sans">Sans-Serif (Hiện đại, dễ đọc)</option>
+                        <option value="font-serif">Serif (Trang trọng, báo chí)</option>
+                        <option value="font-mono">Monospace (Mã lập trình)</option>
+                    </select>
+                </div>
+
+                <!-- Alignment Selector -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Căn Lề Văn Bản</label>
+                    <div class="flex space-x-2">
+                        <button onclick="updateSlideProperty('align', 'text-left')" class="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-center"><i class="fa-solid fa-align-left"></i> Trái</button>
+                        <button onclick="updateSlideProperty('align', 'text-center')" class="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-center"><i class="fa-solid fa-align-center"></i> Giữa</button>
+                        <button onclick="updateSlideProperty('align', 'text-right')" class="flex-1 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded text-xs text-center"><i class="fa-solid fa-align-right"></i> Phải</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Speaker Notes Editor -->
+            <div id="tabNotes" class="p-4 space-y-3 hidden">
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wide">Ghi Chú Người Thuyết Trình</label>
+                <p class="text-[11px] text-slate-400">Những ghi chú này chỉ hiển thị cho bạn khi xem chế độ Presenter Notes hoặc bật gợi ý.</p>
+                <textarea id="editorNotes" oninput="updateSlideProperty('notes', this.value)" rows="8" placeholder="Nhập kịch bản lời nói hoặc ý chính cần nhớ cho slide này..." class="w-full bg-slate-900 border border-slate-700 rounded-lg text-xs px-3 py-2 text-white focus:outline-none focus:border-blue-500 leading-relaxed"></textarea>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL: Photo Library / Folder Photo Manager -->
+    <div id="photoLibraryModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-indigo-600/30 text-indigo-400 rounded-xl">
+                        <i class="fa-solid fa-folder-tree text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-white">Kho Ảnh Thuyết Trình (Local Photo Folder)</h3>
+                        <p class="text-xs text-slate-400">Tải ảnh từ thư mục máy tính của bạn để dùng nhiều lần trong các slide</p>
+                    </div>
+                </div>
+                <button onclick="closePhotoLibraryModal()" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Upload Bar & Action Buttons -->
+            <div class="p-4 border-b border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center space-x-2">
+                    <!-- Bulk Select Files -->
+                    <label class="px-3 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer shadow-md transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-file-image"></i> Chọn Nhiều File Ảnh
+                        <input type="file" multiple accept="image/*" class="hidden" onchange="handlePhotoFolderUpload(event)">
+                    </label>
+
+                    <!-- Select Entire Directory (Webkitdirectory) -->
+                    <label class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer border border-slate-700 transition flex items-center gap-1.5" title="Chọn nguyên cả Folder Photo trên máy tính">
+                        <i class="fa-solid fa-folder-open text-amber-400"></i> Chọn Cả Folder Ảnh
+                        <input type="file" webkitdirectory directory multiple class="hidden" onchange="handlePhotoFolderUpload(event)">
+                    </label>
+                </div>
+
+                <div class="text-xs text-slate-400">
+                    Đã nạp <span id="photoCount" class="text-indigo-400 font-bold">0</span> hình ảnh
+                </div>
+            </div>
+
+            <!-- Photo Grid Gallery -->
+            <div class="flex-1 overflow-y-auto p-4">
+                <div id="photoGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    <!-- Dynamic Photos List rendered here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="photoEmptyState" class="py-12 text-center text-slate-500">
+                    <i class="fa-regular fa-images text-4xl mb-3 block text-slate-600"></i>
+                    <p class="text-sm font-medium">Chưa có ảnh nào trong kho local</p>
+                    <p class="text-xs text-slate-600 mt-1">Nối thư mục foto hoặc chọn nhiều file ảnh để bắt đầu chèn nhanh vào slide.</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-3 border-t border-slate-800 bg-slate-950 flex items-center justify-between text-xs text-slate-400">
+                <span>💡 Bấm vào ảnh bất kỳ để chèn ngay vào Slide hiện tại.</span>
+                <button onclick="closePhotoLibraryModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium">Đóng</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRESENTER NOTES OVERLAY PANEL -->
+    <div id="speakerNotesPanel" class="fixed bottom-16 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-slate-900/95 border border-slate-700 rounded-xl shadow-2xl p-4 z-40 hidden backdrop-blur">
+        <div class="flex items-center justify-between mb-2 pb-2 border-b border-slate-800">
+            <span class="text-xs font-bold text-amber-400 flex items-center gap-2">
+                <i class="fa-solid fa-note-sticky"></i> Ghi Chú Diễn Giả (Presenter Notes)
+            </span>
+            <button onclick="toggleSpeakerNotes()" class="text-slate-400 hover:text-white text-xs">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <p id="speakerNotesDisplay" class="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+            (Không có ghi chú cho slide này)
+        </p>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastContainer" class="fixed top-16 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+
+    <script>
+        /* ==========================================================================
+           1. STATE MANAGEMENT & INITIALIZATION
+           ========================================================================== */
+        
+        // Initial Sample Presentation Data
+        const DEFAULT_PRESENTATION = {
+            title: "Báo Cáo & Thuyết Trình Dự Án 2026",
+            slides: [
+                {
+                    id: 'slide-1',
+                    layout: 'title',
+                    theme: 'dark-tech',
+                    font: 'font-sans',
+                    align: 'text-center',
+                    title: 'Chào Mừng Đến Với Web Slides Pro',
+                    subtitle: 'Ứng dụng thuyết trình chuyên nghiệp trực tiếp trên Trình Duyệt Web',
+                    body: 'Dễ dàng tích hợp thư mục ảnh cá nhân (Photo Folder), vẽ chú thích live & thuyết trình linh hoạt.',
+                    image: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1000&q=80',
+                    notes: 'Lời mở đầu: Chào mừng quý vị đại biểu và anh chị em đồng nghiệp đã có mặt trong buổi thuyết trình ngày hôm nay.'
+                },
+                {
+                    id: 'slide-2',
+                    layout: 'content-image',
+                    theme: 'modern-light',
+                    font: 'font-sans',
+                    align: 'text-left',
+                    title: 'Tính Năng Nổi Bật',
+                    subtitle: 'Tối ưu hóa cho hiệu suất làm việc cao',
+                    body: '• Tích hợp Kho Ảnh Local từ thư mục máy tính.\n• Chế độ Laser Pointer và Bút vẽ chú thích trực tiếp.\n• Chế độ xem Presenter Notes linh hoạt.\n• Xuất / Nhập dự án file JSON lưu trữ dễ dàng.',
+                    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80',
+                    notes: 'Điểm qua 4 tính năng chính nổi bật giúp buổi thuyết trình trở nên sinh động và tương tác cao.'
+                },
+                {
+                    id: 'slide-3',
+                    layout: 'quote',
+                    theme: 'gradient-blue',
+                    font: 'font-serif',
+                    align: 'text-center',
+                    title: 'Sự Đơn Giản Là Đỉnh Cao Của Sự Tinh Tế',
+                    subtitle: '— Leonardo da Vinci',
+                    body: 'Công nghệ tốt nhất là công nghệ phục vụ con người một cách tự nhiên và mượt mà nhất.',
+                    image: '',
+                    notes: 'Nhấn mạnh về tinh thần cốt lõi của giải pháp.'
+                }
+            ]
+        };
+
+        // Application State
+        let currentPresentation = JSON.parse(localStorage.getItem('web_slides_data')) || DEFAULT_PRESENTATION;
+        let currentSlideIndex = 0;
+        let localPhotoLibrary = []; // Store loaded local image assets (DataURL or BlobURL)
+        let isPenActive = false;
+        let isLaserActive = false;
+        let isDrawing = false;
+        let ctx = null;
+
+        // Initialize App on DOM Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initCanvas();
+            renderApp();
+            setupKeyboardShortcuts();
+            window.addEventListener('resize', resizeCanvas);
+        });
+
+        // Save Presentation State to LocalStorage
+        function saveState() {
+            try {
+                localStorage.setItem('web_slides_data', JSON.stringify(currentPresentation));
+                const statusEl = document.getElementById('autosaveStatus');
+                statusEl.classList.remove('opacity-0');
+                setTimeout(() => statusEl.classList.add('opacity-0'), 2000);
+            } catch (e) {
+                console.warn('LocalStorage limit reached or disabled.');
+            }
+        }
+
+        /* ==========================================================================
+           2. CORE RENDERING ENGINE
+           ========================================================================== */
+        
+        function renderApp() {
+            // Update Title Input
+            document.getElementById('presentationTitle').value = currentPresentation.title || 'Bài Thuyết Trình';
+            document.getElementById('slideCountBadge').innerText = `${currentPresentation.slides.length} slide`;
+
+            // Bound Slide Index
+            if (currentSlideIndex >= currentPresentation.slides.length) {
+                currentSlideIndex = Math.max(0, currentPresentation.slides.length - 1);
+            }
+
+            renderThumbnails();
+            renderActiveSlide();
+            populateEditorFields();
+            updateIndicator();
+        }
+
+        // Render Sidebar Thumbnails List
+        function renderThumbnails() {
+            const container = document.getElementById('slideThumbnails');
+            container.innerHTML = '';
+
+            currentPresentation.slides.forEach((slide, index) => {
+                const isActive = index === currentSlideIndex;
+                const thumb = document.createElement('div');
+                thumb.className = `p-2.5 rounded-xl border cursor-pointer transition-all duration-200 relative group flex items-center space-x-3 ${
+                    isActive 
+                        ? 'bg-blue-600/20 border-blue-500 shadow-md ring-1 ring-blue-500' 
+                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                }`;
+                thumb.onclick = () => selectSlide(index);
+
+                thumb.innerHTML = `
+                    <span class="text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-400'}">
+                        ${index + 1}
+                    </span>
+                    <div class="flex-1 truncate">
+                        <p class="text-xs font-semibold text-slate-200 truncate">${escapeHTML(slide.title || 'Slide không tên')}</p>
+                        <p class="text-[10px] text-slate-400 capitalize truncate">${slide.layout}</p>
+                    </div>
+                `;
+                container.appendChild(thumb);
+            });
+        }
+
+        // Render Current Active Slide in Canvas
+        function renderActiveSlide() {
+            const stage = document.getElementById('currentSlideStage');
+            const slide = currentPresentation.slides[currentSlideIndex];
+
+            if (!slide) {
+                stage.innerHTML = `<div class="m-auto text-slate-400 text-sm">Chưa có slide nào. Nhấn + Thêm Slide</div>`;
+                return;
+            }
+
+            // Apply Theme Classes
+            let themeCSS = "bg-white text-slate-900";
+            if (slide.theme === 'dark-tech') themeCSS = "bg-slate-900 text-slate-100";
+            if (slide.theme === 'gradient-blue') themeCSS = "bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 text-white";
+            if (slide.theme === 'warm-editorial') themeCSS = "bg-amber-50 text-amber-950";
+
+            stage.className = `slide-stage slide-aspect w-full rounded-2xl shadow-2xl relative overflow-hidden flex flex-col p-8 md:p-12 transition-all duration-300 ${themeCSS} ${slide.font || 'font-sans'}`;
+
+            // Render Layout Specific HTML
+            stage.innerHTML = generateSlideContentHTML(slide);
+
+            // Update Presenter Notes Display
+            document.getElementById('speakerNotesDisplay').innerText = slide.notes || '(Không có ghi chú cho slide này)';
+        }
+
+        // Generate Slide HTML based on layout
+        function generateSlideContentHTML(slide) {
+            const alignClass = slide.align || 'text-left';
+            const imageSrc = slide.image || 'https://placehold.co/800x500/1e293b/94a3b8?text=Photo+Placeholder';
+
+            switch (slide.layout) {
+                case 'title':
+                    return `
+                        <div class="m-auto max-w-3xl ${alignClass} space-y-6 animate-fadeIn">
+                            <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight leading-tight">${escapeHTML(slide.title)}</h1>
+                            ${slide.subtitle ? `<p class="text-lg md:text-2xl font-medium opacity-80">${escapeHTML(slide.subtitle)}</p>` : ''}
+                            ${slide.body ? `<p class="text-sm md:text-base opacity-70 leading-relaxed max-w-2xl mx-auto">${escapeHTML(slide.body)}</p>` : ''}
+                        </div>
+                    `;
+
+                case 'content-image':
+                    return `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 my-auto items-center h-full">
+                            <div class="space-y-4 ${alignClass}">
+                                <h2 class="text-2xl md:text-4xl font-bold">${escapeHTML(slide.title)}</h2>
+                                ${slide.subtitle ? `<p class="text-sm font-semibold opacity-80 uppercase tracking-wider">${escapeHTML(slide.subtitle)}</p>` : ''}
+                                <div class="text-sm md:text-base opacity-80 whitespace-pre-line leading-relaxed">${escapeHTML(slide.body)}</div>
+                            </div>
+                            <div class="h-full max-h-80 rounded-xl overflow-hidden shadow-lg border border-slate-500/20 flex items-center justify-center bg-slate-800/20">
+                                <img src="${imageSrc}" onerror="this.src='https://placehold.co/800x500/1e293b/ffffff?text=Loi+Anh'" class="w-full h-full object-cover rounded-xl" alt="Slide Image" />
+                            </div>
+                        </div>
+                    `;
+
+                case 'image-content':
+                    return `
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 my-auto items-center h-full">
+                            <div class="h-full max-h-80 rounded-xl overflow-hidden shadow-lg border border-slate-500/20 flex items-center justify-center bg-slate-800/20 order-2 md:order-1">
+                                <img src="${imageSrc}" onerror="this.src='https://placehold.co/800x500/1e293b/ffffff?text=Loi+Anh'" class="w-full h-full object-cover rounded-xl" alt="Slide Image" />
+                            </div>
+                            <div class="space-y-4 ${alignClass} order-1 md:order-2">
+                                <h2 class="text-2xl md:text-4xl font-bold">${escapeHTML(slide.title)}</h2>
+                                ${slide.subtitle ? `<p class="text-sm font-semibold opacity-80 uppercase tracking-wider">${escapeHTML(slide.subtitle)}</p>` : ''}
+                                <div class="text-sm md:text-base opacity-80 whitespace-pre-line leading-relaxed">${escapeHTML(slide.body)}</div>
+                            </div>
+                        </div>
+                    `;
+
+                case 'bullets':
+                    const bullets = (slide.body || '').split('\n').filter(b => b.trim() !== '');
+                    return `
+                        <div class="my-auto max-w-4xl w-full space-y-6 ${alignClass}">
+                            <h2 class="text-2xl md:text-4xl font-bold">${escapeHTML(slide.title)}</h2>
+                            ${slide.subtitle ? `<p class="text-base opacity-80">${escapeHTML(slide.subtitle)}</p>` : ''}
+                            <ul class="space-y-3 mt-4 text-sm md:text-lg">
+                                ${bullets.map(item => `
+                                    <li class="flex items-start space-x-3">
+                                        <span class="text-blue-500 mt-1"><i class="fa-solid fa-circle-dot text-xs"></i></span>
+                                        <span class="opacity-90">${escapeHTML(item.replace(/^•\s*/, ''))}</span>
+                                    </li>
+                                `).join('')}
+                            </ul>
+                        </div>
+                    `;
+
+                case 'quote':
+                    return `
+                        <div class="m-auto max-w-3xl text-center space-y-6">
+                            <i class="fa-solid fa-quote-left text-4xl opacity-30 text-blue-500"></i>
+                            <blockquote class="text-2xl md:text-4xl font-bold italic leading-snug">
+                                "${escapeHTML(slide.title)}"
+                            </blockquote>
+                            ${slide.subtitle ? `<p class="text-base font-semibold opacity-80">— ${escapeHTML(slide.subtitle)}</p>` : ''}
+                            ${slide.body ? `<p class="text-xs md:text-sm opacity-60 max-w-xl mx-auto">${escapeHTML(slide.body)}</p>` : ''}
+                        </div>
+                    `;
+
+                case 'big-image':
+                    return `
+                        <div class="absolute inset-0 w-full h-full">
+                            <img src="${imageSrc}" class="w-full h-full object-cover" alt="Full Slide Image" />
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-8 text-white">
+                                <h2 class="text-3xl font-bold">${escapeHTML(slide.title)}</h2>
+                                ${slide.subtitle ? `<p class="text-base text-slate-300 mt-1">${escapeHTML(slide.subtitle)}</p>` : ''}
+                            </div>
+                        </div>
+                    `;
+
+                case 'code':
+                    return `
+                        <div class="my-auto w-full space-y-4">
+                            <h2 class="text-2xl font-bold">${escapeHTML(slide.title)}</h2>
+                            <div class="bg-slate-950 text-emerald-400 p-4 rounded-xl border border-slate-800 font-mono text-xs md:text-sm overflow-x-auto shadow-inner leading-relaxed">
+                                <pre><code>${escapeHTML(slide.body || '// Enter code here...')}</code></pre>
+                            </div>
+                        </div>
+                    `;
+
+                default:
+                    return `<div class="m-auto">${escapeHTML(slide.title)}</div>`;
+            }
+        }
+
+        // Populate Right Property Panel Fields
+        function populateEditorFields() {
+            const slide = currentPresentation.slides[currentSlideIndex];
+            if (!slide) return;
+
+            document.getElementById('editorLayout').value = slide.layout || 'title';
+            document.getElementById('editorTitle').value = slide.title || '';
+            document.getElementById('editorSubtitle').value = slide.subtitle || '';
+            document.getElementById('editorBody').value = slide.body || '';
+            document.getElementById('editorImage').value = slide.image || '';
+            document.getElementById('editorFont').value = slide.font || 'font-sans';
+            document.getElementById('editorNotes').value = slide.notes || '';
+        }
+
+        // Update Properties on Edit
+        function updateSlideProperty(key, value) {
+            if (!currentPresentation.slides[currentSlideIndex]) return;
+            currentPresentation.slides[currentSlideIndex][key] = value;
+            renderActiveSlide();
+            renderThumbnails();
+            saveState();
+        }
+
+        function updateIndicator() {
+            const total = currentPresentation.slides.length;
+            document.getElementById('slideIndicator').innerText = `${total === 0 ? 0 : currentSlideIndex + 1} / ${total}`;
+        }
+
+        /* ==========================================================================
+           3. SLIDE MANAGEMENT ACTIONS
+           ========================================================================== */
+
+        function selectSlide(index) {
+            currentSlideIndex = index;
+            clearCanvasDrawing();
+            renderApp();
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                selectSlide(currentSlideIndex - 1);
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < currentPresentation.slides.length - 1) {
+                selectSlide(currentSlideIndex + 1);
+            }
+        }
+
+        function addNewSlide() {
+            const newSlide = {
+                id: 'slide-' + Date.now(),
+                layout: 'content-image',
+                theme: 'dark-tech',
+                font: 'font-sans',
+                align: 'text-left',
+                title: 'Tiêu Đề Slide Mới',
+                subtitle: 'Phụ đề cho slide',
+                body: '• Ý chính 1\n• Ý chính 2\n• Ý chính 3',
+                image: '',
+                notes: ''
+            };
+            currentPresentation.slides.splice(currentSlideIndex + 1, 0, newSlide);
+            currentSlideIndex++;
+            renderApp();
+            saveState();
+            showToast('Đã thêm slide mới');
+        }
+
+        function duplicateCurrentSlide() {
+            if (currentPresentation.slides.length === 0) return;
+            const current = currentPresentation.slides[currentSlideIndex];
+            const copy = JSON.parse(JSON.stringify(current));
+            copy.id = 'slide-' + Date.now();
+            copy.title += ' (Bản sao)';
+            currentPresentation.slides.splice(currentSlideIndex + 1, 0, copy);
+            currentSlideIndex++;
+            renderApp();
+            saveState();
+            showToast('Đã nhân bản slide');
+        }
+
+        function deleteCurrentSlide() {
+            if (currentPresentation.slides.length <= 1) {
+                showToast('Không thể xóa slide duy nhất còn lại!');
+                return;
+            }
+            currentPresentation.slides.splice(currentSlideIndex, 1);
+            if (currentSlideIndex >= currentPresentation.slides.length) {
+                currentSlideIndex = currentPresentation.slides.length - 1;
+            }
+            renderApp();
+            saveState();
+            showToast('Đã xóa slide');
+        }
+
+        function createNewPresentation() {
+            currentPresentation = {
+                title: "Bài Thuyết Trình Mới",
+                slides: [{
+                    id: 'slide-1',
+                    layout: 'title',
+                    theme: 'dark-tech',
+                    font: 'font-sans',
+                    align: 'text-center',
+                    title: 'Tiêu Đề Bài Thuyết Trình',
+                    subtitle: 'Nhấn vào bên phải để sửa nội dung slide',
+                    body: '',
+                    image: '',
+                    notes: ''
+                }]
+            };
+            currentSlideIndex = 0;
+            renderApp();
+            saveState();
+            showToast('Đã tạo bài thuyết trình mới!');
+        }
+
+        /* ==========================================================================
+           4. PHOTO LIBRARY & LOCAL FOLDER MANAGEMENT
+           ========================================================================== */
+
+        function openPhotoLibraryModal() {
+            document.getElementById('photoLibraryModal').classList.remove('hidden');
+            renderPhotoGrid();
+        }
+
+        function closePhotoLibraryModal() {
+            document.getElementById('photoLibraryModal').classList.add('hidden');
+        }
+
+        // Process files uploaded from directory or multiple selection
+        function handlePhotoFolderUpload(event) {
+            const files = Array.from(event.target.files || []);
+            const imageFiles = files.filter(f => f.type.startsWith('image/'));
+
+            if (imageFiles.length === 0) {
+                showToast('Không tìm thấy file hình ảnh hợp lệ!');
+                return;
+            }
+
+            let loaded = 0;
+            imageFiles.forEach(file => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    localPhotoLibrary.push({
+                        id: 'photo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+                        name: file.name,
+                        path: file.webkitRelativePath || file.name,
+                        url: e.target.result
+                    });
+                    loaded++;
+                    if (loaded === imageFiles.length) {
+                        renderPhotoGrid();
+                        showToast(`Đã thêm ${imageFiles.length} hình ảnh vào kho local!`);
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Direct Quick Upload for Current Active Slide
+        function uploadImageForCurrentSlide(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                updateSlideProperty('image', e.target.result);
+                showToast('Đã cập nhật ảnh cho slide!');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Render Photo Library Grid Items
+        function renderPhotoGrid() {
+            const grid = document.getElementById('photoGrid');
+            const emptyState = document.getElementById('photoEmptyState');
+            const countLabel = document.getElementById('photoCount');
+
+            countLabel.innerText = localPhotoLibrary.length;
+
+            if (localPhotoLibrary.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = localPhotoLibrary.map(item => `
+                <div onclick="selectPhotoForCurrentSlide('${item.id}')" class="group relative bg-slate-950 border border-slate-800 hover:border-indigo-500 rounded-xl overflow-hidden cursor-pointer shadow-md transition transform hover:-translate-y-1">
+                    <div class="aspect-video w-full overflow-hidden bg-slate-900">
+                        <img src="${item.url}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" alt="${escapeHTML(item.name)}" />
+                    </div>
+                    <div class="p-2 bg-slate-900/90 border-t border-slate-800">
+                        <p class="text-[11px] font-medium text-slate-200 truncate" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</p>
+                        <p class="text-[9px] text-indigo-400 truncate mt-0.5">${escapeHTML(item.path)}</p>
+                    </div>
+                    <div class="absolute inset-0 bg-indigo-600/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                        <span class="bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow"><i class="fa-solid fa-plus"></i> Chèn Slide</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectPhotoForCurrentSlide(photoId) {
+            const item = localPhotoLibrary.find(p => p.id === photoId);
+            if (!item) return;
+            updateSlideProperty('image', item.url);
+            closePhotoLibraryModal();
+            showToast(`Đã chèn ảnh "${item.name}" vào slide!`);
+        }
+
+        /* ==========================================================================
+           5. DRAWING CANVAS & LASER POINTER TOOLS
+           ========================================================================== */
+
+        function initCanvas() {
+            const canvas = document.getElementById('drawingCanvas');
+            ctx = canvas.getContext('2d');
+            resizeCanvas();
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            // Touch device compatibility
+            canvas.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
+            });
+            canvas.addEventListener('touchmove', (e) => {
+                const touch = e.touches[0];
+                draw({ clientX: touch.clientX, clientY: touch.clientY });
+            });
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function resizeCanvas() {
+            const canvas = document.getElementById('drawingCanvas');
+            const main = document.getElementById('mainCanvasArea');
+            canvas.width = main.clientWidth;
+            canvas.height = main.clientHeight;
+        }
+
+        function togglePenTool() {
+            isPenActive = !isPenActive;
+            const btn = document.getElementById('btnPen');
+            const canvas = document.getElementById('drawingCanvas');
+
+            if (isPenActive) {
+                isLaserActive = false;
+                document.getElementById('btnLaser').classList.remove('text-rose-500', 'bg-slate-700');
+                btn.classList.add('text-amber-400', 'bg-slate-700');
+                canvas.classList.remove('pointer-events-none');
+                canvas.style.cursor = 'crosshair';
+                showToast('Đã bật Bút vẽ chú thích (Nhấn C để tắt)');
+            } else {
+                btn.classList.remove('text-amber-400', 'bg-slate-700');
+                canvas.classList.add('pointer-events-none');
+                canvas.style.cursor = 'default';
+            }
+        }
+
+        function toggleLaserPointer() {
+            isLaserActive = !isLaserActive;
+            const btn = document.getElementById('btnLaser');
+            const laserDot = document.getElementById('laserDot');
+
+            if (isLaserActive) {
+                isPenActive = false;
+                document.getElementById('btnPen').classList.remove('text-amber-400', 'bg-slate-700');
+                document.getElementById('drawingCanvas').classList.add('pointer-events-none');
+                
+                btn.classList.add('text-rose-500', 'bg-slate-700');
+                laserDot.classList.remove('hidden');
+                document.body.classList.add('laser-pointer');
+                showToast('Đã bật Con trỏ Laser (Nhấn P để tắt)');
+            } else {
+                btn.classList.remove('text-rose-500', 'bg-slate-700');
+                laserDot.classList.add('hidden');
+                document.body.classList.remove('laser-pointer');
+            }
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isLaserActive) return;
+            const laserDot = document.getElementById('laserDot');
+            laserDot.style.left = e.clientX + 'px';
+            laserDot.style.top = e.clientY + 'px';
+        });
+
+        function startDrawing(e) {
+            if (!isPenActive) return;
+            isDrawing = true;
+            ctx.beginPath();
+            ctx.moveTo(e.clientX, e.clientY);
+        }
+
+        function draw(e) {
+            if (!isDrawing || !isPenActive) return;
+            ctx.strokeStyle = '#f59e0b'; // Amber yellow pen color
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineTo(e.clientX, e.clientY);
+            ctx.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function clearCanvasDrawing() {
+            const canvas = document.getElementById('drawingCanvas');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        /* ==========================================================================
+           6. PRESENTATION & FULLSCREEN CONTROLS
+           ========================================================================== */
+
+        function startPresentation() {
+            toggleMode('present');
+            
+            // Safe handling for Fullscreen API within restricted iframe environments
+            try {
+                const elem = document.documentElement;
+                let fsPromise = null;
+
+                if (elem.requestFullscreen) {
+                    fsPromise = elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) {
+                    fsPromise = elem.webkitRequestFullscreen();
+                }
+
+                if (fsPromise && typeof fsPromise.catch === 'function') {
+                    fsPromise.catch(err => {
+                        console.warn("Fullscreen API disallowed by permission policy:", err);
+                    });
+                }
+            } catch (err) {
+                console.warn("Fullscreen request error:", err);
+            }
+
+            showToast('Đang trình chiếu. Nhấn ESC để quay lại');
+        }
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                startPresentation();
+            } else {
+                try {
+                    let exitPromise = null;
+                    if (document.exitFullscreen) {
+                        exitPromise = document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        exitPromise = document.webkitExitFullscreen();
+                    }
+
+                    if (exitPromise && typeof exitPromise.catch === 'function') {
+                        exitPromise.catch(err => console.warn("Exit fullscreen error:", err));
+                    }
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+        }
+
+        function toggleSpeakerNotes() {
+            const panel = document.getElementById('speakerNotesPanel');
+            panel.classList.toggle('hidden');
+        }
+
+        function toggleMode(mode) {
+            const leftSidebar = document.getElementById('leftSidebar');
+            const rightSidebar = document.getElementById('rightSidebar');
+            const header = document.querySelector('header');
+
+            if (mode === 'present') {
+                leftSidebar.classList.add('hidden');
+                rightSidebar.classList.add('hidden');
+                header.classList.add('hidden');
+            } else {
+                leftSidebar.classList.remove('hidden');
+                rightSidebar.classList.remove('hidden');
+                header.classList.remove('hidden');
+            }
+        }
+
+        // Listen for Fullscreen Change Events
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                toggleMode('edit');
+            }
+        });
+
+        /* ==========================================================================
+           7. KEYBOARD SHORTCUTS & INTERACTION
+           ========================================================================== */
+
+        function setupKeyboardShortcuts() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if user is typing in an input/textarea
+                if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+                switch (e.key) {
+                    case 'ArrowRight':
+                    case 'Space':
+                    case 'PageDown':
+                        e.preventDefault();
+                        nextSlide();
+                        break;
+                    case 'ArrowLeft':
+                    case 'PageUp':
+                        e.preventDefault();
+                        prevSlide();
+                        break;
+                    case 'f':
+                    case 'F':
+                    case 'F5':
+                        e.preventDefault();
+                        toggleFullscreen();
+                        break;
+                    case 'p':
+                    case 'P':
+                        toggleLaserPointer();
+                        break;
+                    case 'c':
+                    case 'C':
+                        togglePenTool();
+                        break;
+                    case 'Escape':
+                        if (isPenActive) togglePenTool();
+                        if (isLaserActive) toggleLaserPointer();
+                        toggleMode('edit');
+                        break;
+                }
+            });
+
+            // Auto-save Title on change
+            document.getElementById('presentationTitle').addEventListener('input', (e) => {
+                currentPresentation.title = e.target.value;
+                saveState();
+            });
+        }
+
+        function switchEditorTab(tabName) {
+            document.getElementById('tabContent').classList.add('hidden');
+            document.getElementById('tabStyle').classList.add('hidden');
+            document.getElementById('tabNotes').classList.add('hidden');
+
+            document.getElementById('tabBtnContent').className = "text-xs font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+            document.getElementById('tabBtnStyle').className = "text-xs font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+            document.getElementById('tabBtnNotes').className = "text-xs font-medium px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition";
+
+            if (tabName === 'content') {
+                document.getElementById('tabContent').classList.remove('hidden');
+                document.getElementById('tabBtnContent').className = "text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white transition";
+            } else if (tabName === 'style') {
+                document.getElementById('tabStyle').classList.remove('hidden');
+                document.getElementById('tabBtnStyle').className = "text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white transition";
+            } else if (tabName === 'notes') {
+                document.getElementById('tabNotes').classList.remove('hidden');
+                document.getElementById('tabBtnNotes').className = "text-xs font-bold px-3 py-1.5 rounded-lg bg-blue-600 text-white transition";
+            }
+        }
+
+        /* ==========================================================================
+           8. EXPORT / IMPORT & UTILITIES
+           ========================================================================== */
+
+        function exportPresentationJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(currentPresentation, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `${currentPresentation.title.replace(/\s+/g, '_')}_slides.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('Đã xuất file bài thuyết trình (.json)');
+        }
+
+        function importPresentationJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported && Array.isArray(imported.slides)) {
+                        currentPresentation = imported;
+                        currentSlideIndex = 0;
+                        renderApp();
+                        saveState();
+                        showToast('Đã mở dự án bài thuyết trình thành công!');
+                    } else {
+                        showToast('File JSON không đúng cấu trúc bài thuyết trình!');
+                    }
+                } catch (err) {
+                    showToast('Lỗi khi đọc file JSON!');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // Utility: Escape HTML to prevent XSS
+        function escapeHTML(str) {
+            if (!str) return '';
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Custom Toast Notification System (No alert)
+        function showToast(message) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = 'bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 flex items-center space-x-2 animate-bounce pointer-events-auto';
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-blue-400"></i><span>${escapeHTML(message)}</span>`;
+
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
